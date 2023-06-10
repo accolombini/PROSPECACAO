@@ -10,6 +10,7 @@ Este projeto tem por objetivo atender ao desafio da Petrobras visando atender a 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 
@@ -80,17 +81,98 @@ for column, max_value, min_value in zip(data_numeric.columns, max_values, min_va
     print(f"{formatted_column}: {formatted_max:{max_value_width + 6}} , {formatted_min:{max_value_width + 6}}")
 
 
-# Análise gráfica => vamos deixar para depois
+# Análise gráfica => vamos deixar para depois o seu aprimoaramento
+# Definir estilo do seaborn
 
-'''
-import matplotlib.pyplot as plt
+sns.set_style('whitegrid')
 
-# Exemplo de histograma
-data['nome_da_coluna'].hist()
+# Loop para gerar histogramas e gráficos de caixa
+for i, column in enumerate(data.columns):
+    # Plotar histograma
+    plt.figure(figsize=(8, 6))
+    sns.histplot(data[column], kde=True, color='skyblue')
+    plt.xlabel(column)
+    plt.ylabel('Frequência')
+    plt.title('Histograma de ' + column)
+
+# Loop para gerar gráficos de boxplot
+for i, column in enumerate(data.columns):
+    # Plotar gráfico de boxplot
+    plt.figure(figsize=(8, 6))
+    sns.boxplot(data=data[column], color='lightcoral')
+    plt.xlabel('Variável')
+    plt.ylabel(column)
+    plt.title('Gráfico de Boxplot: ' + column)
+    plt.show()
+
+    # Loop para gerar gráficos de dispersão com as colunas seguintes
+    for j in range(i + 1, len(data.columns)):
+        # Plotar gráfico de dispersão
+        plt.figure(figsize=(8, 6))
+        sns.scatterplot(data=data, x=column,
+                        y=data.columns[j], color='lightcoral')
+        plt.xlabel(column)
+        plt.ylabel(data.columns[j])
+        plt.title('Gráfico de Dispersão: ' +
+                  column + ' vs ' + data.columns[j])
+        plt.show()
+
+# Analisando a correlação entre as variáveis
+# Calculando a matriz de correlação
+
+correlation_matrix = data.corr()
+
+# Criando um mapa de calor
+plt.figure(figsize=(10, 8))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
+plt.title('Mapa de Calor - Correlação entre Variáveis')
 plt.show()
 
-# Exemplo de gráfico de dispersão
-plt.scatter(data['coluna_x'], data['coluna_y'])
-plt.show()
+# Identificando as principais correlações positivas e negativas
+threshold = 0.5  # Definindo um valor de limite para destacar as correlações significativas
+correlation_pairs = correlation_matrix.unstack().sort_values(ascending=False)
+significant_correlations = correlation_pairs[(correlation_pairs > threshold) & (correlation_pairs < 1)]
+positive_correlations = significant_correlations[significant_correlations > 0]
+negative_correlations = significant_correlations[significant_correlations < 0]
 
-'''
+# Imprimindo as principais correlações positivas
+print('Principais correlações positivas:')
+for pair, correlation in positive_correlations.items():
+    variable_1, variable_2 = pair
+    print(f'{variable_1} e {variable_2}: {correlation:.2f}')
+
+# Imprimindo as principais correlações negativas
+print('\nPrincipais correlações negativas:')
+for pair, correlation in negative_correlations.items():
+    variable_1, variable_2 = pair
+    print(f'{variable_1} e {variable_2}: {correlation:.2f}')
+
+# ================================== Iniciando com os testes mesmo ==========================
+# Vamos agora começar a olhar para o arquivo de forma particular, separando operação Normal e
+# dados de Teste
+
+# Separar o DataFrame para operação normal
+df_normal = data.loc[data['role'] == 'normal']
+
+# Separar o DataFrame para teste
+df_test = data.loc[data['role'] == 'test-0']
+
+# Preparando os dados - identificando as variáveis
+
+def preprocess_data(df):
+    # Identificar colunas numéricas e categóricas
+    numeric_columns = df.select_dtypes(include=['float', 'int']).columns
+    categorical_columns = df.select_dtypes(include=['object', 'category']).columns
+
+    # Tratar colunas categóricas usando codificação one-hot
+    df_encoded = pd.get_dummies(df, columns=categorical_columns)
+
+    # Separar a variável de destino do restante dos dados
+    target_column = 'target'  # Substitua pelo nome da sua coluna de destino
+    target = df_encoded.pop(target_column)
+
+    return df_encoded, target
+
+# Exemplo de uso
+df_normal_encoded, target = preprocess_data(df_normal)
+df_test_encoded, target_test = preprocess_data(df_test)
