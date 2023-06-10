@@ -9,10 +9,15 @@ Este projeto tem por objetivo atender ao desafio da Petrobras visando atender a 
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.model_selection import train_test_split
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 
 # Carregando os dados
 
@@ -80,47 +85,48 @@ for column, max_value, min_value in zip(data_numeric.columns, max_values, min_va
     formatted_min = f"Mín = {min_value:.2f}".replace(".", ",")
     print(f"{formatted_column}: {formatted_max:{max_value_width + 6}} , {formatted_min:{max_value_width + 6}}")
 
+# =========================================================================================
 
 # Análise gráfica => vamos deixar para depois o seu aprimoaramento
 # Definir estilo do seaborn
 
-sns.set_style('whitegrid')
+'''
+# Remover a coluna 'role' do DataFrame
+data_without_role = data.drop('role', axis=1)
 
 # Loop para gerar histogramas e gráficos de caixa
-for i, column in enumerate(data.columns):
+for column in data_without_role.columns:
     # Plotar histograma
     plt.figure(figsize=(8, 6))
-    sns.histplot(data[column], kde=True, color='skyblue')
+    sns.histplot(data=data_without_role[column], kde=True, color='skyblue')
     plt.xlabel(column)
     plt.ylabel('Frequência')
     plt.title('Histograma de ' + column)
+    plt.show()
 
-# Loop para gerar gráficos de boxplot
-for i, column in enumerate(data.columns):
     # Plotar gráfico de boxplot
     plt.figure(figsize=(8, 6))
-    sns.boxplot(data=data[column], color='lightcoral')
+    sns.boxplot(data=data_without_role[column], color='lightcoral')
     plt.xlabel('Variável')
     plt.ylabel(column)
     plt.title('Gráfico de Boxplot: ' + column)
     plt.show()
 
     # Loop para gerar gráficos de dispersão com as colunas seguintes
-    for j in range(i + 1, len(data.columns)):
-        # Plotar gráfico de dispersão
-        plt.figure(figsize=(8, 6))
-        sns.scatterplot(data=data, x=column,
-                        y=data.columns[j], color='lightcoral')
-        plt.xlabel(column)
-        plt.ylabel(data.columns[j])
-        plt.title('Gráfico de Dispersão: ' +
-                  column + ' vs ' + data.columns[j])
-        plt.show()
+    for column2 in data_without_role.columns:
+        if column != column2:
+            # Plotar gráfico de dispersão
+            plt.figure(figsize=(8, 6))
+            sns.scatterplot(data=data_without_role, x=column,
+                            y=column2, color='lightcoral')
+            plt.xlabel(column)
+            plt.ylabel(column2)
+            plt.title('Gráfico de Dispersão: ' + column + ' vs ' + column2)
+            plt.show()
 
 # Analisando a correlação entre as variáveis
 # Calculando a matriz de correlação
-
-correlation_matrix = data.corr()
+correlation_matrix = data_without_role.corr()
 
 # Criando um mapa de calor
 plt.figure(figsize=(10, 8))
@@ -131,7 +137,8 @@ plt.show()
 # Identificando as principais correlações positivas e negativas
 threshold = 0.5  # Definindo um valor de limite para destacar as correlações significativas
 correlation_pairs = correlation_matrix.unstack().sort_values(ascending=False)
-significant_correlations = correlation_pairs[(correlation_pairs > threshold) & (correlation_pairs < 1)]
+significant_correlations = correlation_pairs[(
+    correlation_pairs > threshold) & (correlation_pairs < 1)]
 positive_correlations = significant_correlations[significant_correlations > 0]
 negative_correlations = significant_correlations[significant_correlations < 0]
 
@@ -147,6 +154,7 @@ for pair, correlation in negative_correlations.items():
     variable_1, variable_2 = pair
     print(f'{variable_1} e {variable_2}: {correlation:.2f}')
 
+'''
 # ================================== Iniciando com os testes mesmo ==========================
 # Vamos agora começar a olhar para o arquivo de forma particular, separando operação Normal e
 # dados de Teste
@@ -159,20 +167,62 @@ df_test = data.loc[data['role'] == 'test-0']
 
 # Preparando os dados - identificando as variáveis
 
-def preprocess_data(df):
-    # Identificar colunas numéricas e categóricas
-    numeric_columns = df.select_dtypes(include=['float', 'int']).columns
-    categorical_columns = df.select_dtypes(include=['object', 'category']).columns
+# Preparação dos dados
+# Remover a coluna "role" dos dataframes
+df_normal = df_normal.drop('role', axis=1)
+df_test = df_test.drop('role', axis=1)
 
-    # Tratar colunas categóricas usando codificação one-hot
-    df_encoded = pd.get_dummies(df, columns=categorical_columns)
+# Realizar codificação one-hot para colunas categóricas
+encoder = OneHotEncoder()
+df_normal_encoded = pd.get_dummies(df_normal, columns=['role'])
+df_test_encoded = pd.get_dummies(df_test, columns=['role'])
 
-    # Separar a variável de destino do restante dos dados
-    target_column = 'target'  # Substitua pelo nome da sua coluna de destino
-    target = df_encoded.pop(target_column)
+# Separar a variável de destino (target) do restante dos dados
+X_train = df_normal_encoded.drop('target_column', axis=1)
+y_train = df_normal_encoded['target_column']
+X_test = df_test_encoded.drop('target_column', axis=1)
+y_test = df_test_encoded['target_column']
 
-    return df_encoded, target
+# Treinamento do modelo
+model = RandomForestClassifier()
+model.fit(X_train, y_train)
 
-# Exemplo de uso
-df_normal_encoded, target = preprocess_data(df_normal)
-df_test_encoded, target_test = preprocess_data(df_test)
+# Avaliação do modelo
+y_pred = model.predict(X_test)
+
+# Métricas de avaliação
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred)
+recall = recall_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred)
+
+# Matriz de confusão
+cm = confusion_matrix(y_test, y_pred)
+
+# Cálculo de falsos positivos e falsos negativos em termos percentuais
+total_samples = len(y_test)
+false_positives = cm[0, 1]
+false_negatives = cm[1, 0]
+false_positives_percent = false_positives / total_samples * 100
+false_negatives_percent = false_negatives / total_samples * 100
+
+# Antecedência de detecção de falha
+failure_detected = y_test[y_pred == 1].index.min()
+
+# Visualização da matriz de confusão
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, cmap='Blues', fmt='g')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.title('Matriz de Confusão')
+plt.show()
+
+# Visualização dos resultados
+print('Métricas de Avaliação:')
+print('Acurácia:', accuracy)
+print('Precisão:', precision)
+print('Recall:', recall)
+print('F1-score:', f1)
+print('\nFalsos Positivos (%):', false_positives_percent)
+print('Falsos Negativos (%):', false_negatives_percent)
+print('Antecedência de Detecção de Falha:', failure_detected)
