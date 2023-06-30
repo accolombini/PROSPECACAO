@@ -16,8 +16,8 @@ import pandas as pd
 import numpy as np
 from sklearn.decomposition import PCA
 from factor_analyzer import FactorAnalyzer
-import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 # Carregando a base de dados limpa
 df = pd.read_excel('DADOS/OUTLIERS_FREE.xlsx')
@@ -26,12 +26,18 @@ df = pd.read_excel('DADOS/OUTLIERS_FREE.xlsx')
 df = df.select_dtypes(include=[np.number])
 
 # Calculando a matriz de correlação
-corr_matrix = df.corr()
+corr_matrix = df.corr().abs()
 
-# Selecionando as variáveis com correlação menor ou igual a 0.5
-low_corr_vars = corr_matrix[corr_matrix.abs() <= 0.5].index
+# Plotando o mapa de calor da correlação
+plt.figure(figsize=(24,14))
+sns.heatmap(corr_matrix, cmap='coolwarm', annot=True, fmt=".2f")
+plt.show()
 
-print("\nVariáveis selecionadas com correlação <= 0.5:")
+# Selecionando as variáveis com a menor correlação média
+mean_correlation = corr_matrix.mean()
+low_corr_vars = mean_correlation.nsmallest(10).index.tolist()  # substitua 10 pelo número de variáveis que você quer selecionar
+
+print("\nVariáveis selecionadas com a menor correlação média:")
 print(low_corr_vars)
 
 # Atualizando o DataFrame com as variáveis selecionadas
