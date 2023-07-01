@@ -50,61 +50,72 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense
 
-def load_and_prepare_data():
-    df = pd.read_csv('DADOS/Adendo A.2_Conjunto de Dados_DataSet.csv')
-    df = df.replace(99999.99, np.nan)
 
-    for column in df.select_dtypes(include=[np.number]).columns:
-        df[column].fillna(df[column].mean(), inplace=True)
+class AnomalyDetector:
 
-    df = df.drop(columns=['offset_seconds'])
-    df_train = df[df['role'] == 'normal'].select_dtypes(include=[np.number])
-    df_test = df[df['role'] == 'test-0'].select_dtypes(include=[np.number])
-    return df, df_train, df_test
+    def __init__(self, data_file, output_file):
+        self.data_file = data_file
+        self.output_file = output_file
+        self.df_train = None
+        self.df_test = None
+        self.model = None
 
-def create_model(input_dim, encoding_dim=14):
-    model = Sequential()
-    model.add(Dense(encoding_dim, activation="relu", input_shape=(input_dim,)))
-    model.add(Dense(input_dim, activation='sigmoid'))
-    model.compile(optimizer='adam', loss='mean_squared_error')
-    return model
+    def load_and_prepare_data(self):
+        df = pd.read_csv(self.data_file)
+        df = df.replace(99999.99, np.nan)
 
-def train_and_predict(model, df_train, df_test):
-    model.fit(df_train, df_train, epochs=50, batch_size=32, shuffle=True, validation_split=0.2)
-    df_train_pred = model.predict(df_train)
-    df_test_pred = model.predict(df_test)
-    return df_train_pred, df_test_pred
+        for column in df.select_dtypes(include=[np.number]).columns:
+            df[column].fillna(df[column].mean(), inplace=True)
 
-def calculate_reconstruction_error(df_train, df_train_pred, df_test, df_test_pred):
-    reconstruction_error_train = np.mean(np.power(df_train - df_train_pred, 2), axis=1)
-    reconstruction_error_test = np.mean(np.power(df_test - df_test_pred, 2), axis=1)
-    threshold = np.mean(reconstruction_error_train) + 3 * np.std(reconstruction_error_train)
-    df_train['anomaly'] = (reconstruction_error_train > threshold).astype(int)
-    df_test['anomaly'] = (reconstruction_error_test > threshold).astype(int)
-    print(f"Número de anomalias na base de treinamento: {df_train['anomaly'].sum()}")
-    print(f"Número de anomalias na base de teste: {df_test['anomaly'].sum()}")
-    return df_train, df_test
+        self.df_train = df[df['role'] == 'normal'].select_dtypes(include=[np.number])
+        self.df_test = df[df['role'] == 'test-0'].select_dtypes(include=[np.number])
 
-def report_anomalies(df_train, df_test):
-    report = pd.DataFrame(columns=['Instante', 'Variável', 'Valor'])
-    anomalies = df_test[df_test['anomaly'] == 1]
-    for index, row in anomalies.iterrows():
-        print(f"\nRegistro de anomalia detectada no instante {index}:")
-        for column in [c for c in anomalies.columns if c != 'anomaly']:
-            if row[column] > df_train[column].mean() + 3 * df_train[column].std():
-                print(f"A variável {column} apresentou um comportamento anômalo com valor {row[column]}")
-                report_temp = pd.DataFrame([[index, column, row[column]]], columns=['Instante', 'Variável', 'Valor'])
-                report = pd.concat([report, report_temp], ignore_index=True)
-    return report
+    def create_model(self, encoding_dim=14):
+        input_dim = self.df_train.shape[1]
+        self.model = Sequential()
+        self.model.add(Dense(encoding_dim, activation="relu", input_shape=(input_dim,)))
+        self.model.add(Dense(input_dim, activation='sigmoid'))
+        self.model.compile(optimizer='adam', loss='mean_squared_error')
 
-def main():
-    df, df_train, df_test = load_and_prepare_data()
-    input_dim = df_train.shape[1]
-    model = create_model(input_dim)
-    df_train_pred, df_test_pred = train_and_predict(model, df_train, df_test)
-    df_train, df_test = calculate_reconstruction_error(df_train, df_train_pred, df_test, df_test_pred)
-    report = report_anomalies(df_train, df_test)
-    report.to_excel('DADOS/FINAL_back_30_6.xlsx', index=False)
+    def train_and_predict(self):
+        self.model.fit(self.df_train, self.df_train, epochs=50, batch_size=32, shuffle=True, validation_split=0.2)
+        df_train_pred = self.model.predict(self.df_train)
+        df_test_pred = self.model.predict(self.df_test)
+        return df_train_pred, df_test_pred
+
+    def calculate_reconstruction_error(self, df_train_pred, df_test_pred):
+        reconstruction_error_train = np.mean(np.power(self.df_train - df_train_pred, 2), axis=1)
+        reconstruction_error_test = np.mean(np.power(self.df_test - df_test_pred, 2), axis=1)
+        threshold = np.mean(reconstruction_error_train) + 3 * np.std(reconstruction_error_train)
+        self.df_train['anomaly'] = (reconstruction_error_train > threshold).astype(int)
+        self.df_test['anomaly'] = (reconstruction_error_test > threshold).astype(int)
+        print(f"Número de anomalias na base de treinamento: {self.df_train['anomaly'].sum()}")
+        print(f"Número de anomalias na base de teste: {self.df_test['anomaly'].sum()}")
+
+    def report_anomalies(self):
+        report = pd.DataFrame(columns=['offset_seconds', 'Registro'] + list(self.df_test.columns[:-1]) + ['TOTAL_Anom'])
+        for index, row in self.df_test.iterrows():
+            anomaly_row = [index, index]
+            total_anom = 0
+            for column in self.df_test.columns[:-1]:  # Excluding 'anomaly' column
+                if row[column] > self.df_train[column].mean() + 3 * self.df_train[column].std():
+                    anomaly_row.append(1)
+                    total_anom += 1
+                else:
+                    anomaly_row.append(0)
+            anomaly_row.append(total_anom)
+            report_temp = pd.DataFrame([anomaly_row], columns=report.columns)
+            report = pd.concat([report, report_temp], ignore_index=True)
+        report.to_excel(self.output_file, index=False, sheet_name='RELATÓRIO')
+
+    def run(self):
+        self.load_and_prepare_data()
+        self.create_model()
+        df_train_pred, df_test_pred = self.train_and_predict()
+        self.calculate_reconstruction_error(df_train_pred, df_test_pred)
+        self.report_anomalies()
+
 
 if __name__ == "__main__":
-    main()
+    ad = AnomalyDetector('DADOS/Adendo A.2_Conjunto de Dados_DataSet.csv', 'DADOS/FINAL.xlsx')
+    ad.run()

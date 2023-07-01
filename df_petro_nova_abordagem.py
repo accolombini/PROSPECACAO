@@ -43,68 +43,17 @@ passos, agora com a base original, isto é sem a remoção dos Outliers.:
     Nota: O cálculo de anomalia para cada variável é baseado em uma abordagem comum de classificar um valor como anômalo
     se ele estiver a mais de 3 desvios padrões da média.
 
+    Threshold adaptativo: Atualmente, você está usando um limite fixo para todas as amostras. No entanto, este limite
+    pode não ser ideal para todas as amostras, especialmente se a distribuição do erro de reconstrução for
+    significativamente não-normal. Uma maneira de lidar com isso é usar um limite adaptativo que depende da própria
+    amostra (por exemplo, um valor que depende do valor de uma variável específica para a amostra).
+
+Erro de reconstrução ponderado: Atualmente, todas as variáveis contribuem igualmente para o erro de reconstrução. No
+entanto, pode ser que algumas variáveis sejam mais importantes para a detecção de anomalias do que outras.
+Uma maneira de lidar com isso é ponderar o erro de reconstrução com a importância da variável
+(por exemplo, com base na variância da variável).
+
+Regularização: Adicionar regularização (como L1 ou L2) ao seu Autoencoder pode ajudar a melhorar o desempenho.
+A regularização pode forçar o Autoencoder a aprender representações mais robustas dos dados.
+
 """
-
-import pandas as pd
-import numpy as np
-from keras.models import Sequential
-from keras.layers import Dense
-
-def load_and_prepare_data():
-    df = pd.read_csv('DADOS/Adendo A.2_Conjunto de Dados_DataSet.csv')
-    df = df.replace(99999.99, np.nan)
-
-    for column in df.select_dtypes(include=[np.number]).columns:
-        df[column].fillna(df[column].mean(), inplace=True)
-
-    df = df.drop(columns=['offset_seconds'])
-    df_train = df[df['role'] == 'normal'].select_dtypes(include=[np.number])
-    df_test = df[df['role'] == 'test-0'].select_dtypes(include=[np.number])
-    return df, df_train, df_test
-
-def create_model(input_dim, encoding_dim=14):
-    model = Sequential()
-    model.add(Dense(encoding_dim, activation="relu", input_shape=(input_dim,)))
-    model.add(Dense(input_dim, activation='sigmoid'))
-    model.compile(optimizer='adam', loss='mean_squared_error')
-    return model
-
-def train_and_predict(model, df_train, df_test):
-    model.fit(df_train, df_train, epochs=50, batch_size=32, shuffle=True, validation_split=0.2)
-    df_train_pred = model.predict(df_train)
-    df_test_pred = model.predict(df_test)
-    return df_train_pred, df_test_pred
-
-def calculate_reconstruction_error(df_train, df_train_pred, df_test, df_test_pred):
-    reconstruction_error_train = np.mean(np.power(df_train - df_train_pred, 2), axis=1)
-    reconstruction_error_test = np.mean(np.power(df_test - df_test_pred, 2), axis=1)
-    threshold = np.mean(reconstruction_error_train) + 3 * np.std(reconstruction_error_train)
-    df_train['anomaly'] = (reconstruction_error_train > threshold).astype(int)
-    df_test['anomaly'] = (reconstruction_error_test > threshold).astype(int)
-    print(f"Número de anomalias na base de treinamento: {df_train['anomaly'].sum()}")
-    print(f"Número de anomalias na base de teste: {df_test['anomaly'].sum()}")
-    return df_train, df_test
-
-def report_anomalies(df_train, df_test):
-    report = pd.DataFrame(columns=['Instante', 'Variável', 'Valor'])
-    anomalies = df_test[df_test['anomaly'] == 1]
-    for index, row in anomalies.iterrows():
-        print(f"\nRegistro de anomalia detectada no instante {index}:")
-        for column in [c for c in anomalies.columns if c != 'anomaly']:
-            if row[column] > df_train[column].mean() + 3 * df_train[column].std():
-                print(f"A variável {column} apresentou um comportamento anômalo com valor {row[column]}")
-                report_temp = pd.DataFrame([[index, column, row[column]]], columns=['Instante', 'Variável', 'Valor'])
-                report = pd.concat([report, report_temp], ignore_index=True)
-    return report
-
-def main():
-    df, df_train, df_test = load_and_prepare_data()
-    input_dim = df_train.shape[1]
-    model = create_model(input_dim)
-    df_train_pred, df_test_pred = train_and_predict(model, df_train, df_test)
-    df_train, df_test = calculate_reconstruction_error(df_train, df_train_pred, df_test, df_test_pred)
-    report = report_anomalies(df_train, df_test)
-    report.to_excel('DADOS/FINAL_back_30_6.xlsx', index=False)
-
-if __name__ == "__main__":
-    main()

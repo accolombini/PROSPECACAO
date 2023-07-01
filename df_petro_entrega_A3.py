@@ -50,17 +50,31 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense
 
+
 def load_and_prepare_data():
-    df = pd.read_csv('DADOS/Adendo A.2_Conjunto de Dados_DataSet.csv')
+    df = pd.read_csv('DADOS/Adendo A.3_Conjunto de Dados_DataSet.csv')
     df = df.replace(99999.99, np.nan)
 
     for column in df.select_dtypes(include=[np.number]).columns:
         df[column].fillna(df[column].mean(), inplace=True)
 
-    df = df.drop(columns=['offset_seconds'])
     df_train = df[df['role'] == 'normal'].select_dtypes(include=[np.number])
-    df_test = df[df['role'] == 'test-0'].select_dtypes(include=[np.number])
-    return df, df_train, df_test
+    df_test_0 = df[df['role'] == 'test-0'].select_dtypes(include=[np.number])
+    df_test_1 = df[df['role'] == 'test-1'].select_dtypes(include=[np.number])
+
+    return df, df_train, df_test_0, df_test_1
+
+
+def data_analysis(df, df_name):
+    print(f"Análise da base de dados: {df_name}")
+    print(f"Quantidade de linhas: {df.shape[0]}")
+    print(f"Quantidade de colunas: {df.shape[1]}")
+    print("Tipo de dados em cada coluna:")
+    print(df.dtypes)
+    print("Quantidade de dados faltantes em cada coluna:")
+    print(df.isnull().sum())
+    print("\n")
+
 
 def create_model(input_dim, encoding_dim=14):
     model = Sequential()
@@ -69,42 +83,57 @@ def create_model(input_dim, encoding_dim=14):
     model.compile(optimizer='adam', loss='mean_squared_error')
     return model
 
+
 def train_and_predict(model, df_train, df_test):
     model.fit(df_train, df_train, epochs=50, batch_size=32, shuffle=True, validation_split=0.2)
-    df_train_pred = model.predict(df_train)
-    df_test_pred = model.predict(df_test)
-    return df_train_pred, df_test_pred
+    df_pred = model.predict(df_test)
+    return df_pred
 
-def calculate_reconstruction_error(df_train, df_train_pred, df_test, df_test_pred):
-    reconstruction_error_train = np.mean(np.power(df_train - df_train_pred, 2), axis=1)
-    reconstruction_error_test = np.mean(np.power(df_test - df_test_pred, 2), axis=1)
-    threshold = np.mean(reconstruction_error_train) + 3 * np.std(reconstruction_error_train)
-    df_train['anomaly'] = (reconstruction_error_train > threshold).astype(int)
-    df_test['anomaly'] = (reconstruction_error_test > threshold).astype(int)
-    print(f"Número de anomalias na base de treinamento: {df_train['anomaly'].sum()}")
-    print(f"Número de anomalias na base de teste: {df_test['anomaly'].sum()}")
-    return df_train, df_test
 
 def report_anomalies(df_train, df_test):
-    report = pd.DataFrame(columns=['Instante', 'Variável', 'Valor'])
-    anomalies = df_test[df_test['anomaly'] == 1]
-    for index, row in anomalies.iterrows():
-        print(f"\nRegistro de anomalia detectada no instante {index}:")
-        for column in [c for c in anomalies.columns if c != 'anomaly']:
+    report = pd.DataFrame(columns=['offset_seconds', 'Registro'] + list(df_test.columns) + ['TOTAL_Anom'])
+    total_anom = 0
+    for index, row in df_test.iterrows():
+        anomaly_row = [index, index]
+        row_anom = 0
+        for column in df_test.columns:
             if row[column] > df_train[column].mean() + 3 * df_train[column].std():
-                print(f"A variável {column} apresentou um comportamento anômalo com valor {row[column]}")
-                report_temp = pd.DataFrame([[index, column, row[column]]], columns=['Instante', 'Variável', 'Valor'])
-                report = pd.concat([report, report_temp], ignore_index=True)
-    return report
+                anomaly_row.append(1)
+                row_anom += 1
+            else:
+                anomaly_row.append(0)
+        anomaly_row.append(row_anom)
+        if row_anom > 0:
+            total_anom += 1
+        report_temp = pd.DataFrame([anomaly_row], columns=report.columns)
+        report = pd.concat([report, report_temp], ignore_index=True)
+    return report, total_anom
+
 
 def main():
-    df, df_train, df_test = load_and_prepare_data()
-    input_dim = df_train.shape[1]
-    model = create_model(input_dim)
-    df_train_pred, df_test_pred = train_and_predict(model, df_train, df_test)
-    df_train, df_test = calculate_reconstruction_error(df_train, df_train_pred, df_test, df_test_pred)
-    report = report_anomalies(df_train, df_test)
-    report.to_excel('DADOS/FINAL_back_30_6.xlsx', index=False)
+    df, df_train, df_test_0, df_test_1 = load_and_prepare_data()
+    data_analysis(df, "Total")
+    data_analysis(df_train, "Treinamento")
+    data_analysis(df_test_0, "Teste-0")
+    data_analysis(df_test_1, "Teste-1")
+
+    model = create_model(df_train.shape[1])
+
+    df_test_0_pred = train_and_predict(model, df_train, df_test_0)
+    report_0, total_anom_0 = report_anomalies(df_train, df_test_0)
+
+    df_test_1_pred = train_and_predict(model, df_train, df_test_1)
+    report_1, total_anom_1 = report_anomalies(df_train, df_test_1)
+
+    # Escreve relatórios para abas separadas em uma única planilha Excel
+    with pd.ExcelWriter('DADOS/FINAL_A3.xlsx') as writer:
+        report_0.to_excel(writer, index=False, sheet_name='RELAT_T_0')
+        report_1.to_excel(writer, index=False, sheet_name='RELAT_T1')
+
+    # Relatório de anomalias na tela
+    print(f"Total de anomalias na base Teste-0: {total_anom_0}")
+    print(f"Total de anomalias na base Teste-1: {total_anom_1}")
+
 
 if __name__ == "__main__":
     main()

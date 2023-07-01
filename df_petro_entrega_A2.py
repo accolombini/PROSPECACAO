@@ -57,7 +57,6 @@ def load_and_prepare_data():
     for column in df.select_dtypes(include=[np.number]).columns:
         df[column].fillna(df[column].mean(), inplace=True)
 
-    df = df.drop(columns=['offset_seconds'])
     df_train = df[df['role'] == 'normal'].select_dtypes(include=[np.number])
     df_test = df[df['role'] == 'test-0'].select_dtypes(include=[np.number])
     return df, df_train, df_test
@@ -86,15 +85,19 @@ def calculate_reconstruction_error(df_train, df_train_pred, df_test, df_test_pre
     return df_train, df_test
 
 def report_anomalies(df_train, df_test):
-    report = pd.DataFrame(columns=['Instante', 'Variável', 'Valor'])
-    anomalies = df_test[df_test['anomaly'] == 1]
-    for index, row in anomalies.iterrows():
-        print(f"\nRegistro de anomalia detectada no instante {index}:")
-        for column in [c for c in anomalies.columns if c != 'anomaly']:
+    report = pd.DataFrame(columns=['offset_seconds', 'Registro'] + list(df_test.columns[:-1]) + ['TOTAL_Anom'])
+    for index, row in df_test.iterrows():
+        anomaly_row = [index, index]
+        total_anom = 0
+        for column in df_test.columns[:-1]:  # Excluding 'anomaly' column
             if row[column] > df_train[column].mean() + 3 * df_train[column].std():
-                print(f"A variável {column} apresentou um comportamento anômalo com valor {row[column]}")
-                report_temp = pd.DataFrame([[index, column, row[column]]], columns=['Instante', 'Variável', 'Valor'])
-                report = pd.concat([report, report_temp], ignore_index=True)
+                anomaly_row.append(1)
+                total_anom += 1
+            else:
+                anomaly_row.append(0)
+        anomaly_row.append(total_anom)
+        report_temp = pd.DataFrame([anomaly_row], columns=report.columns)
+        report = pd.concat([report, report_temp], ignore_index=True)
     return report
 
 def main():
@@ -104,7 +107,7 @@ def main():
     df_train_pred, df_test_pred = train_and_predict(model, df_train, df_test)
     df_train, df_test = calculate_reconstruction_error(df_train, df_train_pred, df_test, df_test_pred)
     report = report_anomalies(df_train, df_test)
-    report.to_excel('DADOS/FINAL_back_30_6.xlsx', index=False)
+    report.to_excel('DADOS/FINAL.xlsx', index=False, sheet_name='RELATÓRIO')
 
 if __name__ == "__main__":
     main()

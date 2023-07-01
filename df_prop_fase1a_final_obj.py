@@ -50,6 +50,7 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense
 
+
 class AnomalyDetector:
     def __init__(self, filepath, encoding_dim=14):
         self.filepath = filepath
@@ -99,14 +100,16 @@ class AnomalyDetector:
             for column in [c for c in anomalies.columns if c != 'anomaly']:
                 if row[column] > self.df_train[column].mean() + 3 * self.df_train[column].std():
                     print(f"A variável {column} apresentou um comportamento anômalo com valor {row[column]}")
-                    report_temp = pd.DataFrame([[index, column, row[column]]], columns=['Instante', 'Variável', 'Valor'])
+                    report_temp = pd.DataFrame([[index, column, row[column]]],
+                                               columns=['Instante', 'Variável', 'Valor'])
                     self.report = pd.concat([self.report, report_temp], ignore_index=True)
 
     def run(self):
         self.train_and_predict()
         self.calculate_reconstruction_error()
         self.report_anomalies()
-        self.report.to_excel('DADOS/FINAL.xlsx', index=False)
+        self.report.to_excel('DADOS/FINAL_back_30_6.xlsx', index=False)
+
 
 if __name__ == "__main__":
     detector = AnomalyDetector('DADOS/Adendo A.2_Conjunto de Dados_DataSet.csv')
