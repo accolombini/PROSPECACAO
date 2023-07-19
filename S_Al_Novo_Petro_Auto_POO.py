@@ -51,14 +51,17 @@ from keras.layers import Dense
 from scipy.stats import anderson
 
 
+# Classe para detecção de anomalias usando autoencoder
 class AnomalyDetector:
     def __init__(self, file_path):
+        # Inicialização dos atributos e carregamento dos dados
         self.file_path = file_path
         self.df, self.df_train, self.df_test = self.load_and_prepare_data()
         self.input_dim = self.df_train.shape[1]
         self.model = self.create_model(self.input_dim)
 
     def load_and_prepare_data(self):
+        # Carregar e preparar os dados: limpeza, substituição e divisão entre treino e teste
         df = pd.read_csv(self.file_path)
         df = df.replace(99999.99, np.nan)
 
@@ -71,6 +74,7 @@ class AnomalyDetector:
         return df, df_train, df_test
 
     def check_normality(self):
+        # Verifica a normalidade das colunas dos dados
         for column in self.df.select_dtypes(include=[np.number]).columns:
             result = anderson(self.df[column])
             stat = result.statistic
@@ -81,6 +85,7 @@ class AnomalyDetector:
                 print(f'Coluna {column} segue uma distribuição normal')
 
     def create_model(self, input_dim, encoding_dim=14):
+        # Criação do modelo autoencoder para detecção de anomalias
         model = Sequential()
         model.add(Dense(encoding_dim, activation="relu", input_shape=(input_dim,)))
         model.add(Dense(input_dim, activation='sigmoid'))
@@ -88,12 +93,14 @@ class AnomalyDetector:
         return model
 
     def train_and_predict(self):
+        # Treinamento do modelo e predição para conjuntos de treino e teste
         self.model.fit(self.df_train, self.df_train, epochs=50, batch_size=32, shuffle=True, validation_split=0.2)
         df_train_pred = self.model.predict(self.df_train)
         df_test_pred = self.model.predict(self.df_test)
         return df_train_pred, df_test_pred
 
     def calculate_reconstruction_error(self, df_train_pred, df_test_pred):
+        # Calcula o erro de reconstrução e determina anomalias com base em um limite
         reconstruction_error_train = np.mean(np.power(self.df_train - df_train_pred, 2), axis=1)
         reconstruction_error_test = np.mean(np.power(self.df_test - df_test_pred, 2), axis=1)
         threshold = np.mean(reconstruction_error_train) + 3 * np.std(reconstruction_error_train)
@@ -103,13 +110,14 @@ class AnomalyDetector:
         print(f"Número de anomalias na base de teste: {self.df_test['anomaly'].sum()}")
 
     def report_anomalies(self):
+        # Gera um relatório de anomalias com base em desvios padrão do conjunto de treinamento
         report = pd.DataFrame(columns=['offset_seconds', 'Registro'] + list(self.df_test.columns[:-1]) + ['TOTAL_Anom'])
         anom_stats = pd.DataFrame(columns=['Registro', 'Variable', 'Mean', 'Found Value', 'Deviation'])
 
         for index, row in self.df_test.iterrows():
             anomaly_row = [index, index]
             total_anom = 0
-            for column in self.df_test.columns[:-1]:  # Excluding 'anomaly' column
+            for column in self.df_test.columns[:-1]:  # Excluindo coluna 'anomaly'
                 if row[column] > self.df_train[column].mean() + 3 * self.df_train[column].std():
                     anomaly_row.append(1)
                     total_anom += 1
@@ -127,6 +135,7 @@ class AnomalyDetector:
         return report
 
     def run(self):
+        # Método principal para executar todas as etapas: verificação de normalidade, treinamento, predição e geração de relatório
         self.check_normality()
         df_train_pred, df_test_pred = self.train_and_predict()
         self.calculate_reconstruction_error(df_train_pred, df_test_pred)
@@ -134,6 +143,7 @@ class AnomalyDetector:
         report.to_excel('DADOS_SIMUL/FINAL_A2.xlsx', index=False, sheet_name='RELATÓRIO')
 
 
+# Inicializa e executa o detector de anomalias
 if __name__ == "__main__":
     detector = AnomalyDetector('DADOS/Adendo A.2_Conjunto de Dados_DataSet.csv')
     detector.run()
