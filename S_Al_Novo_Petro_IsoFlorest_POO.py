@@ -4,36 +4,33 @@ Neste algoritmo temos o seguinte:
     Este algoritmo foi direcionado para trabalhar com a base Adendo A.2_Conjunto de Dados_DataSet.csv
     Dividir a base de dados com base na coluna 'role': Vamos dividir o DataFrame original em dois: um DataFrame de
     treinamento que consiste apenas em dados 'normais' e um DataFrame de teste que consiste em dados 'test-0'.
-    Vamos usar o DataFrame de treinamento para treinar nosso autoencoder e o DataFrame de teste para avaliar seu
+    Vamos usar o DataFrame de treinamento para treinar nosso Isolation Forest e o DataFrame de teste para avaliar seu
     desempenho.
 
-    Treinar o Isolation Forest: Com base no DataFrame de treinamento, vamos treinar nosso autoencoder. O objetivo é
-    permitir
-    que o Isolation Forest aprenda a reconstruir as operações normais com a menor perda possível.
+    Treinar o Isolation Forest: Com base no DataFrame de treinamento, vamos treinar nosso Isolation Forest. O objetivo é
+    permitir que o Isolation Forest aprenda a reconstruir as operações normais com a menor perda possível.
         A opção pelo uso do Isolation Forest --> se deve ao fato de ser um algoritmo propício para detecção de anomalias
-        (há outros) mas vamos começar por aqui. Outro fato importante é que se trata de um algoritmo de aprendizagem
-        profunda e que não demanda que os dados sigam uma distribuição normal.
+        (há outros), como o autoenconder e o One-Class SVM, mas vamos começar por aqui (existem ainda outros além dos
+        três utilizados nestes testes.. Outro fato importante é que se trata de um algoritmo de aprendizagem profunda
+        e que não demanda que os dados sigam uma distribuição normal.
 
-    Testar o Isolation Forest: Após o treinamento, vamos aplicar o autoencoder aos dados de teste para gerar previsões. Vamos
-    calcular o erro de reconstrução para cada observação e marcar as observações com erro de reconstrução acima de um
-    certo limiar como anomalias. (isto pode ser ajustado vamos iniciar com +/- 3 sigmas).
+    Testar o Isolation Forest: Após o treinamento, vamos aplicar o Isolation Forest aos dados de teste para gerar
+    previsões. Vamos calcular o erro de reconstrução para cada observação e marcar as observações com erro de
+    reconstrução acima de um certo limiar como anomalias. (isto pode ser ajustado vamos iniciar com +/- 3 sigmas).
 
-    Obs.: o que estamos fazendo neste algoritmo <=>
-
-        Essa nova versão do código:
+    Obs.: o que estamos fazendo neste algoritmo:
 
         Estamos usando o teste de Shapiro-Wilk pode ser usado para verificar a normalidade dos dados.
-        Este método não atendeu.
-        Vamos testar também sar o teste de normalidade de Anderson-Darling que é uma versão modificada do teste de
+        Este método não atendeu, pois se restringe a arquivos com reduzido número de registros, abaixo de 5.000.
+        Vamos usar o teste de normalidade de Anderson-Darling que é uma versão modificada do teste de
         Kolmogorov-Smirnov e tem mais poder para uma ampla gama de alternativas.
 
-        Usa a estrutura de modelo Sequential do Keras, que é mais simples e intuitiva (há outras para serem testadas).
+        Utilizar a estrutura de modelo Sequential do Keras, que é mais simples e intuitiva (há outras para serem
+        testadas).
         Não remove os outliers dos dados de treinamento, o que pode melhorar a capacidade do modelo de detectar
         anomalias.
         Classifica =>> observação será considerado como uma anomalia se seu erro de reconstrução for maior do que três
-        vezes o desvio padrão (+/-) 3 sigmas.
-        Este é um método muito comum utilizado para detectar outliers baseado na suposição de que os dados seguem uma
-        distribuição normal.
+        vezes o desvio padrão (+/-) 3 sigmas. Este é um método muito comum utilizado para detectar outliers.
         Contar o número de anomalias na base de treinamento e de teste.
         Imprimir uma descrição estatística para cada variável nas observações que foram classificadas como anomalias.
         Isso pode nos dar algumas indicações sobre quais variáveis contribuíram para as anomalias. Foi suprimido na
@@ -128,5 +125,6 @@ class AnomalyDetectorIsolationForest:
 
 # Executando o detector de anomalias usando Isolation Forest
 if __name__ == "__main__":
+    # Instanciando o objeto
     detector = AnomalyDetectorIsolationForest('DADOS/Adendo A.2_Conjunto de Dados_DataSet.csv')
     detector.run()

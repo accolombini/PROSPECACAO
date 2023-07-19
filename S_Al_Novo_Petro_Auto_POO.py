@@ -10,40 +10,38 @@ Neste algoritmo temos o seguinte:
     Treinar o Autoencoder: Com base no DataFrame de treinamento, vamos treinar nosso autoencoder. O objetivo é permitir
     que o autoencoder aprenda a reconstruir as operações normais com a menor perda possível.
         A opção pelo uso do autoencoder --> se deve ao fato de ser um algoritmo propício para detecção de anomalias
-        (há outros) mas vamos começar por aqui. Outro fato importante é que se trata de um algoritmo de aprendizagem
+        (há outros), mas vamos começar por aqui. Outro fato importante é que se trata de um algoritmo de aprendizagem
         profunda e que não demanda que os dados sigam uma distribuição normal.
 
     Testar o Autoencoder: Após o treinamento, vamos aplicar o autoencoder aos dados de teste para gerar previsões. Vamos
     calcular o erro de reconstrução para cada observação e marcar as observações com erro de reconstrução acima de um
     certo limiar como anomalias. (isto pode ser ajustado vamos iniciar com +/- 3 sigmas).
 
-    Obs.: o que estamos fazendo neste algoritmo <=>
-
-        Essa nova versão do código:
+    Obs.: o que estamos fazendo neste algoritmo:
 
         Estamos usando o teste de Shapiro-Wilk pode ser usado para verificar a normalidade dos dados.
-        Este método não atendeu.
-        Vamos testar também sar o teste de normalidade de Anderson-Darling que é uma versão modificada do teste de
-        Kolmogorov-Smirnov e tem mais poder para uma ampla gama de alternativas.
+        Este método não atendeu, pois se restringe a arquivos com menos de 5000 registros.
+        Vamos usar o  teste de normalidade de Anderson-Darling que é uma versão modificada do teste de
+        Kolmogorov-Smirnov e tem mais poder para uma ampla gama de alternativas e maior quantidade de registros.
 
-        Usa a estrutura de modelo Sequential do Keras, que é mais simples e intuitiva (há outras para serem testadas).
+        Utilizar a estrutura de modelo Sequential do Keras, que é mais simples e intuitiva (há outras para serem
+        testadas).
         Não remove os outliers dos dados de treinamento, o que pode melhorar a capacidade do modelo de detectar
         anomalias.
         Classifica =>> observação será considerado como uma anomalia se seu erro de reconstrução for maior do que três
-        vezes o desvio padrão (+/-) 3 sigmas.
-        Este é um método muito comum utilizado para detectar outliers baseado na suposição de que os dados seguem uma
-        distribuição normal.
+        vezes o desvio padrão (+/-) 3 sigmas. Este é um método muito comum utilizado para detectar outliers.
         Contar o número de anomalias na base de treinamento e de teste.
         Imprimir uma descrição estatística para cada variável nas observações que foram classificadas como anomalias.
-        Isso pode nos dar algumas indicações sobre quais variáveis contribuíram para as anomalias. Foi suprimido na
-        entrega, pois neste apenas sinalizamos na saída os pontos sem anomalia (0) e com anomalia (1) no arquivo de
-        saída.
+        Isso pode nos dar algumas indicações sobre quais variáveis contribuíram para as anomalias. Esta parte do
+        código foi suprimida na entrega, pois para a entrega apenas sinalizamos na saída os pontos sem anomalia (0) e
+        com anomalia (1) no arquivo de saída.
 
     Importante: Esse código assume que seu conjunto de treinamento não contém anomalias (como normalmente é o caso ao
     treinar um autoencoder para detecção de anomalias). Caso o conjunto de treinamento contenha anomalias
-    e quer que o modelo seja capaz de detectá-las, é preciso ajustar a maneira como o limiar é calculado.
-
+    e quer que o modelo seja capaz de detectá-las, é preciso ajustar a forma como o limiar é calculado.
 """
+
+# Importando as bibliotecas necessárias
 import pandas as pd
 import numpy as np
 from keras.models import Sequential
@@ -135,7 +133,8 @@ class AnomalyDetector:
         return report
 
     def run(self):
-        # Método principal para executar todas as etapas: verificação de normalidade, treinamento, predição e geração de relatório
+        # Método principal para executar todas as etapas: verificação de normalidade, treinamento, predição e
+        # geração de relatório
         self.check_normality()
         df_train_pred, df_test_pred = self.train_and_predict()
         self.calculate_reconstruction_error(df_train_pred, df_test_pred)
@@ -145,5 +144,6 @@ class AnomalyDetector:
 
 # Inicializa e executa o detector de anomalias
 if __name__ == "__main__":
+    # Instanciando o objeto
     detector = AnomalyDetector('DADOS/Adendo A.2_Conjunto de Dados_DataSet.csv')
     detector.run()
